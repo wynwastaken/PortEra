@@ -1,0 +1,11 @@
+<?php
+// Copy this file to config.php and replace the values with your Midtrans keys.
+// Keep config.php private and never expose it from your Next.js public directory.
+return [
+    'server_key' => 'SB-Mid-server-REPLACE_WITH_YOUR_SERVER_KEY',
+    'is_production' => false,
+    'allowed_origins' => [
+        'http://localhost:3000',
+        'http://127.0.0.1:3000',
+    ],
+];
