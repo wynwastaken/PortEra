@@ -33,6 +33,9 @@ const plans = [
 ];
 
 export default function Home() {
+  const waNumber = process.env.NEXT_PUBLIC_PORTERA_WHATSAPP_NUMBER || '6281234567890';
+  const waText = encodeURIComponent(order?.customer?.fullname ? `Halo tim PortEra, saya ${order.customer.fullname}. Saya ingin bertanya tentang pesanan portfolio saya.` : 'Halo tim PortEra, saya ingin bertanya tentang layanan portfolio.');
+ 
   return <>
     <section className="hero container" id="home">
       <div className="hero-copy">
@@ -68,5 +71,13 @@ export default function Home() {
     <section className="reviews-section"><div className="container"><SectionHeading eyebrow="KISAH NYATA" title="Cerita Sukses Rekan Mahasiswa" description="Pengalaman nyata mereka yang telah mempercayakan kurasi portfolionya pada PortEra."/><div className="review-grid">{reviews.map(([initials, name, role, quote]) => <article className="review-card" key={name}><div className="stars">★★★★★</div><p className="quote">{quote}</p><div className="review-person"><span>{initials}</span><div><strong>{name}</strong><small>{role}</small></div></div></article>)}</div></div></section>
 
     <section className="faq-section" id="faq"><div className="container"><SectionHeading eyebrow="PUSAT BANTUAN" title="Pertanyaan yang Sering Diajukan" description="Jawaban transparan untuk menjawab rasa penasaranmu sebelum memulai pemesanan."/><FAQList/><div className="faq-more">Masih punya pertanyaan? <a href="https://wa.me/6280000000000" target="_blank" rel="noreferrer">Hubungi tim kami <ArrowUpRight size={14}/></a></div></div></section>
+       <a
+  className="checkout-whatsapp-float"
+  href={`https://wa.me/${waNumber}?text=${waText}`}
+  target="_blank"
+  rel="noreferrer"
+>
+  <span>▣</span> Pesan via WhatsApp
+</a>
   </>;
 }
