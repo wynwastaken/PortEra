@@ -40,12 +40,13 @@ export default function PemesananPage() {
   const [paymentError, setPaymentError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [order, setOrder] = useState({ packageId: 'website', addons: [], visualStyle: 'corporate', palette: 'navy', industry: industries[0], language: 'id', graduation: 'fresh' });
- const waNumber =
+  const waNumber =
   process.env.NEXT_PUBLIC_PORTERA_WHATSAPP_NUMBER || '6281234567890';
 
 const waText = encodeURIComponent(
   'Halo tim PortEra, saya ingin bertanya mengenai layanan portfolio.'
 );
+  const selectedPackage = packages.find((pkg) => pkg.id === order.packageId) ?? packages[1];
   const selectedStyle = styles.find((style) => style.id === order.visualStyle) ?? styles[0];
   const selectedPalette = palettes.find((palette) => palette.id === order.palette) ?? palettes[0];
   const selectedGraduation = { fresh: 'Fresh Graduate', active: 'Mahasiswa Aktif', final: 'Mahasiswa Tingkat Akhir', other: 'Lainnya' }[order.graduation];
