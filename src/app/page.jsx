@@ -33,8 +33,12 @@ const plans = [
 ];
 
 export default function Home() {
-  const waNumber = process.env.NEXT_PUBLIC_PORTERA_WHATSAPP_NUMBER || '6281234567890';
-  const waText = encodeURIComponent(order?.customer?.fullname ? `Halo tim PortEra, saya ${order.customer.fullname}. Saya ingin bertanya tentang pesanan portfolio saya.` : 'Halo tim PortEra, saya ingin bertanya tentang layanan portfolio.');
+  const waNumber =
+  process.env.NEXT_PUBLIC_PORTERA_WHATSAPP_NUMBER || '6281234567890';
+
+const waText = encodeURIComponent(
+  'Halo tim PortEra, saya ingin bertanya mengenai layanan portfolio.'
+);
  
   return <>
     <section className="hero container" id="home">
