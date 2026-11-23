@@ -89,7 +89,7 @@ export default function CheckoutPage() {
         onSuccess: () => router.push(`/pesanan?status=success&order_id=${encodeURIComponent(data.order_id)}`),
         onPending: () => router.push(`/pesanan?status=pending&order_id=${encodeURIComponent(data.order_id)}`),
         onError: () => setPaymentError('Pembayaran gagal diproses. Silakan coba kembali.'),
-        onClose: () => setPaymentError('Popup pembayaran ditutup. Kamu masih bisa mencoba lagi dengan menekan Bayar Sekarang.'),
+        onClose: () => router.push(`/pesanan?status=closed&order_id=${encodeURIComponent(data.order_id)}`),
       });
     } catch (error) {
       console.error('Midtrans payment error:', error);
