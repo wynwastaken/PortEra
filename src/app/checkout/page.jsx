@@ -99,7 +99,7 @@ export default function CheckoutPage() {
     }
   };
 
-  const waNumber = process.env.NEXT_PUBLIC_PORTERA_WHATSAPP_NUMBER || '6281234567890';
+  const waNumber = process.env.NEXT_PUBLIC_PORTERA_WHATSAPP_NUMBER || '6281226863661';
   const waText = encodeURIComponent(order?.customer?.fullname ? `Halo tim PortEra, saya ${order.customer.fullname}. Saya ingin bertanya tentang pesanan portfolio saya.` : 'Halo tim PortEra, saya ingin bertanya tentang layanan portfolio.');
 
   if (orderLoading) return <main className="checkout-page"><div className="checkout-empty"><h1>Memuat pesanan...</h1><p>Sedang mengambil detail pesanan dari database.</p></div></main>;

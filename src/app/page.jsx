@@ -34,7 +34,7 @@ const plans = [
 
 export default function Home() {
   const waNumber =
-  process.env.NEXT_PUBLIC_PORTERA_WHATSAPP_NUMBER || '6281234567890';
+  process.env.NEXT_PUBLIC_PORTERA_WHATSAPP_NUMBER || '6281226863661';
 
 const waText = encodeURIComponent(
   'Halo tim PortEra, saya ingin bertanya mengenai layanan portfolio.'
