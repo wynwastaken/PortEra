@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import './pemesanan.css';
 
@@ -40,12 +41,73 @@ export default function PemesananPage() {
   const [paymentError, setPaymentError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [order, setOrder] = useState({ packageId: 'website', addons: [], visualStyle: 'corporate', palette: 'navy', industry: industries[0], language: 'id', graduation: 'fresh' });
-  const waNumber =
-  process.env.NEXT_PUBLIC_PORTERA_WHATSAPP_NUMBER || '6281226863661';
+  const [editOrderId, setEditOrderId] = useState('');
+  const [customer, setCustomer] = useState({
+    fullname: '',
+    whatsapp: '',
+    email: '',
+    university: '',
+    major: '',
+  });
+  const [cloudLink, setCloudLink] = useState('');
+  const [existingFiles, setExistingFiles] = useState([]);
+  const [formKey, setFormKey] = useState(0);
+  const waNumber = process.env.NEXT_PUBLIC_PORTERA_WHATSAPP_NUMBER || '6281226863661';
 
 const waText = encodeURIComponent(
   'Halo tim PortEra, saya ingin bertanya mengenai layanan portfolio.'
 );
+
+    useEffect(() => {
+    const loadPreviousOrder = async () => {
+      const params = new URLSearchParams(window.location.search);
+      const orderId = params.get('edit_order_id');
+
+      if (!orderId) return;
+
+      try {
+        const apiUrl = process.env.NEXT_PUBLIC_PORTERA_API_URL;
+
+        const response = await fetch(
+          `${apiUrl}/get-order.php?order_id=${encodeURIComponent(orderId)}`,
+          { cache: 'no-store' }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok || !data.success || !data.order) {
+          throw new Error(data.message || 'Gagal mengambil data pesanan.');
+        }
+
+        const previous = data.order;
+
+        setEditOrderId(previous.order_id);
+
+        setOrder({
+          packageId: previous.packageId,
+          addons: previous.addons || [],
+          visualStyle: previous.brief.visualStyle,
+          palette: previous.brief.palette,
+          industry: previous.brief.industry,
+          language: previous.brief.language,
+          graduation: previous.brief.graduation,
+        });
+
+        setCustomer(previous.customer);
+        setCloudLink(previous.brief.cloudLink || '');
+        setExistingFiles(previous.uploadedFiles || []);
+
+        // Memuat ulang defaultValue pada input form
+        setFormKey((current) => current + 1);
+
+      } catch (error) {
+        console.error('Load previous order error:', error);
+        setPaymentError(error.message);
+      }
+    };
+
+    loadPreviousOrder();
+  }, []);
   const selectedPackage = packages.find((pkg) => pkg.id === order.packageId) ?? packages[1];
   const selectedStyle = styles.find((style) => style.id === order.visualStyle) ?? styles[0];
   const selectedPalette = palettes.find((palette) => palette.id === order.palette) ?? palettes[0];
@@ -71,7 +133,8 @@ const waText = encodeURIComponent(
     const formData = new FormData(event.currentTarget);
 
     const orderData = {
-      packageId: order.packageId,
+    order_id: editOrderId || null,
+    packageId: order.packageId,
       addons: order.addons,
       customer: {
         fullname: String(formData.get('fullname') || '').trim(),
@@ -123,7 +186,11 @@ const waText = encodeURIComponent(
           <div className="brief-progress"><div className="progress-step done"><span>✓</span><b>Pilih Paket</b></div><i/><div className="progress-step active"><span>2</span><b>Detail Brief</b><small>SEDANG DIISI</small></div><i/><div className="progress-step"><span>3</span><b>Pembayaran</b></div></div>
         </div>
 
-        <form className="order-layout" onSubmit={handleContinueToCheckout}>
+                  <form
+            key={formKey}
+            className="order-layout"
+            onSubmit={handleContinueToCheckout}
+          >
           <div className="order-form-content">
             <section className="brief-section">
               <SectionTitle letter="A" title="Konfirmasi Paket PortEra" description="Ubah tipe format pengerjaan jika diperlukan sebelum tahap kurasi dimulai." extra="Langkah Wajib" />
@@ -134,11 +201,57 @@ const waText = encodeURIComponent(
             <section className="brief-section">
               <SectionTitle letter="B" title="Profil Mahasiswa & Karir Sasaran" description="Data ini akan menjadi baseline personal branding pada header portfolio."/>
               <div className="brief-fields">
-                <label>Nama Lengkap &amp; Gelar (jika ada) *<input name="fullname" placeholder="Nama lengkap kamu" required/></label>
-                <label>Nomor WhatsApp Aktif *<input name="whatsapp" type="tel" placeholder="+62 812-3456-7890" required/></label>
-                <label>Email Kampus / Email Profesional *<input name="email" type="email" placeholder="nama@email.com" required/></label>
-                <label>Universitas / Institusi Akademik *<input name="university" placeholder="Nama universitas" required/></label>
-                <label>Program Studi / Jurusan *<input name="major" placeholder="Contoh: Sistem Informasi" required/></label>
+                <label>
+  Nama Lengkap &amp; Gelar (jika ada) *
+  <input
+    name="fullname"
+    defaultValue={customer.fullname}
+    placeholder="Nama lengkap kamu"
+    required
+  />
+</label>
+
+<label>
+  Nomor WhatsApp Aktif *
+  <input
+    name="whatsapp"
+    type="tel"
+    defaultValue={customer.whatsapp}
+    placeholder="+62 812-3456-7890"
+    required
+  />
+</label>
+
+<label>
+  Email Kampus / Email Profesional *
+  <input
+    name="email"
+    type="email"
+    defaultValue={customer.email}
+    placeholder="nama@email.com"
+    required
+  />
+</label>
+
+<label>
+  Universitas / Institusi Akademik *
+  <input
+    name="university"
+    defaultValue={customer.university}
+    placeholder="Nama universitas"
+    required
+  />
+</label>
+
+<label>
+  Program Studi / Jurusan *
+  <input
+    name="major"
+    defaultValue={customer.major}
+    placeholder="Contoh: Sistem Informasi"
+    required
+  />
+</label>
                 <label>Status / Estimasi Tahun Lulus *<select name="graduation" value={order.graduation} onChange={event => setOrder(current => ({ ...current, graduation: event.target.value }))} required><option value="fresh">Fresh Graduate (Tahun 2024–2025)</option><option value="active">Mahasiswa Aktif</option><option value="final">Mahasiswa Tingkat Akhir</option><option value="other">Lainnya</option></select></label>
               </div>
               <div className="brief-industry"><b>Target Industri &amp; Peran Pekerjaan Sasaran</b><p>Pilih kategori utama agar tone of voice studi kasus disesuaikan:</p><div className="brief-choice-grid">{industries.map((item) => <label key={item}><input type="radio" name="industry" value={item} checked={order.industry === item} onChange={() => setOrder(current => ({ ...current, industry: item }))}/>{item}</label>)}</div></div>
@@ -148,7 +261,25 @@ const waText = encodeURIComponent(
             <section className="brief-section">
               <SectionTitle letter="C" title="Upload CV / Resume & Draft Materi" description="Materi Anda akan diolah menjadi studi kasus dengan struktur STAR Method."/>
               <label className="brief-upload"><input type="file" name="documents" accept=".pdf,.doc,.docx,.zip,.rar" multiple/><span className="brief-upload-icon">⇧</span><b>Klik untuk pilih file atau tarik &amp; letakkan di sini</b><p>Unggah CV/Resume terkini, sertifikat, atau draft rangkuman kegiatan (PDF, DOCX, ZIP maks 25MB)</p><small>.PDF　 .DOCX　 .ZIP / .RAR</small></label>
-              <label className="brief-cloud">Atau cantumkan Tautan Cloud (Google Drive / Notion / GitHub / Figma)<input type="url" name="cloudLink" placeholder="https://drive.google.com/drive/folders/..."/><small>Pastikan akses tautan diatur ke “Anyone with the link can view” agar tim desainer dapat langsung menganalisis berkas.</small></label>
+              {existingFiles.length > 0 && (
+  <div className="brief-existing-files">
+    <b>File sebelumnya:</b>
+
+    {existingFiles.map((file, index) => (
+      <p key={index}>📄 {file.name}</p>
+    ))}
+
+    <small>
+      File lama tetap tercatat. Pilih ulang file jika ingin menggantinya.
+    </small>
+  </div>
+)}
+              <label className="brief-cloud">Atau cantumkan Tautan Cloud (Google Drive / Notion / GitHub / Figma)<input
+  type="url"
+  name="cloudLink"
+  defaultValue={cloudLink}
+  placeholder="https://drive.google.com/drive/folders/..."
+/><small>Pastikan akses tautan diatur ke “Anyone with the link can view” agar tim desainer dapat langsung menganalisis berkas.</small></label>
             </section>
 
             <section className="brief-section">

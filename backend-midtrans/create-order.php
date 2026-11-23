@@ -58,17 +58,279 @@ try {
  $pdo=portera_db(); $pdo->beginTransaction();
  $publicId=bin2hex(random_bytes(16));
  $orderCode='PORTERA-'.date('YmdHis').'-'.strtoupper(bin2hex(random_bytes(3)));
- $stmt=$pdo->prepare("INSERT INTO orders (public_id,order_code,package_id,package_name,customer_name,customer_email,customer_whatsapp,university,major,subtotal,total_amount) VALUES (?,?,?,?,?,?,?,?,?,?,?)");
- $stmt->execute([$publicId,$orderCode,$packageId,$packages[$packageId]['name'],$name,$email,$phone,$university,$major,$subtotal,$subtotal]);
- $id=(int)$pdo->lastInsertId();
- $a=$pdo->prepare("INSERT INTO order_addons (order_id,addon_id,addon_name,unit_price,quantity,line_total) VALUES (?,?,?,?,1,?)");
- foreach($selected as $addonId){$price=(int)$addons[$addonId]['price'];$a->execute([$id,$addonId,$addons[$addonId]['name'],$price,$price]);}
- $brief=$pdo->prepare("INSERT INTO order_briefs (order_id,graduation_status,target_industry,portfolio_language,visual_style,color_palette,cloud_link) VALUES (?,?,?,?,?,?,?)");
- $brief->execute([$id,$graduation,$industry,$language,$style,$palette,trim((string)($b['cloudLink']??''))]);
- $f=$pdo->prepare("INSERT INTO order_files (order_id,original_name,file_size,upload_status) VALUES (?,?,?,'metadata_only')");
- foreach(($input['uploadedFiles']??[]) as $file){if(!is_array($file))continue;$fn=trim((string)($file['name']??''));if($fn!=='')$f->execute([$id,substr($fn,0,255),max(0,(int)($file['size']??0))]);}
- $pdo->commit();
- portera_respond(201,['success'=>true,'order_id'=>$publicId,'order_code'=>$orderCode,'message'=>'Pesanan berhasil dibuat.']);
+ $editOrderId = trim((string)($input['order_id'] ?? ''));
+
+if ($editOrderId !== '') {
+
+    if (!preg_match('/^[a-f0-9]{32}$/', $editOrderId)) {
+        $pdo->rollBack();
+        portera_respond(400, [
+            'success' => false,
+            'message' => 'ID pesanan tidak valid.'
+        ]);
+    }
+
+    $find = $pdo->prepare(
+        "SELECT id,order_code, payment_status, order_status
+         FROM orders
+         WHERE public_id = ?
+         LIMIT 1
+         FOR UPDATE"
+    );
+
+    $find->execute([$editOrderId]);
+    $existing = $find->fetch();
+
+    if (!$existing) {
+        $pdo->rollBack();
+        portera_respond(404, [
+            'success' => false,
+            'message' => 'Pesanan tidak ditemukan.'
+        ]);
+    }
+
+    if (
+        $existing['payment_status'] === 'paid' ||
+        $existing['order_status'] === 'paid'
+    ) {
+        $pdo->rollBack();
+        portera_respond(409, [
+            'success' => false,
+            'message' => 'Pesanan yang sudah dibayar tidak dapat diubah.'
+        ]);
+    }
+
+    $id = (int)$existing['id'];
+    $publicId = $editOrderId;
+
+    $stmt = $pdo->prepare(
+        "UPDATE orders SET
+            package_id = ?,
+            package_name = ?,
+            customer_name = ?,
+            customer_email = ?,
+            customer_whatsapp = ?,
+            university = ?,
+            major = ?,
+            subtotal = ?,
+            total_amount = ?,
+            midtrans_token = NULL,
+            midtrans_redirect_url = NULL
+         WHERE id = ?"
+    );
+
+    $stmt->execute([
+        $packageId,
+        $packages[$packageId]['name'],
+        $name,
+        $email,
+        $phone,
+        $university,
+        $major,
+        $subtotal,
+        $subtotal,
+        $id
+    ]);
+
+    // Perbarui add-on
+    $deleteAddons = $pdo->prepare(
+        "DELETE FROM order_addons WHERE order_id = ?"
+    );
+    $deleteAddons->execute([$id]);
+
+    $a = $pdo->prepare(
+        "INSERT INTO order_addons
+        (order_id, addon_id, addon_name, unit_price, quantity, line_total)
+        VALUES (?, ?, ?, ?, 1, ?)"
+    );
+
+    foreach ($selected as $addonId) {
+        $price = (int)$addons[$addonId]['price'];
+
+        $a->execute([
+            $id,
+            $addonId,
+            $addons[$addonId]['name'],
+            $price,
+            $price
+        ]);
+    }
+
+    // Perbarui brief
+    $brief = $pdo->prepare(
+        "UPDATE order_briefs SET
+            graduation_status = ?,
+            target_industry = ?,
+            portfolio_language = ?,
+            visual_style = ?,
+            color_palette = ?,
+            cloud_link = ?
+         WHERE order_id = ?"
+    );
+
+    $brief->execute([
+        $graduation,
+        $industry,
+        $language,
+        $style,
+        $palette,
+        trim((string)($b['cloudLink'] ?? '')),
+        $id
+    ]);
+
+    // Jika brief belum memiliki record, buat record baru
+    if ($brief->rowCount() === 0) {
+        $check = $pdo->prepare(
+            "SELECT id FROM order_briefs WHERE order_id = ?"
+        );
+        $check->execute([$id]);
+
+        if (!$check->fetch()) {
+            $insertBrief = $pdo->prepare(
+                "INSERT INTO order_briefs
+                (order_id, graduation_status, target_industry,
+                 portfolio_language, visual_style, color_palette, cloud_link)
+                VALUES (?, ?, ?, ?, ?, ?, ?)"
+            );
+
+            $insertBrief->execute([
+                $id,
+                $graduation,
+                $industry,
+                $language,
+                $style,
+                $palette,
+                trim((string)($b['cloudLink'] ?? ''))
+            ]);
+        }
+    }
+
+    // Pertahankan file lama jika pengguna tidak memilih file baru
+    $newFiles = $input['uploadedFiles'] ?? [];
+
+    if (is_array($newFiles) && count($newFiles) > 0) {
+        $deleteFiles = $pdo->prepare(
+            "DELETE FROM order_files WHERE order_id = ?"
+        );
+        $deleteFiles->execute([$id]);
+
+        $f = $pdo->prepare(
+            "INSERT INTO order_files
+            (order_id, original_name, file_size, upload_status)
+            VALUES (?, ?, ?, 'metadata_only')"
+        );
+
+        foreach ($newFiles as $file) {
+            if (!is_array($file)) continue;
+
+            $fn = trim((string)($file['name'] ?? ''));
+
+            if ($fn !== '') {
+                $f->execute([
+                    $id,
+                    substr($fn, 0, 255),
+                    max(0, (int)($file['size'] ?? 0))
+                ]);
+            }
+        }
+    }
+
+} else {
+
+    // Buat pesanan baru
+    $publicId = bin2hex(random_bytes(16));
+
+    $orderCode = 'PORTERA-' . date('YmdHis') . '-' .
+        strtoupper(bin2hex(random_bytes(3)));
+
+    $stmt = $pdo->prepare(
+        "INSERT INTO orders
+        (public_id, order_code, package_id, package_name,
+         customer_name, customer_email, customer_whatsapp,
+         university, major, subtotal, total_amount)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    );
+
+    $stmt->execute([
+        $publicId,
+        $orderCode,
+        $packageId,
+        $packages[$packageId]['name'],
+        $name,
+        $email,
+        $phone,
+        $university,
+        $major,
+        $subtotal,
+        $subtotal
+    ]);
+
+    $id = (int)$pdo->lastInsertId();
+
+    $a = $pdo->prepare(
+        "INSERT INTO order_addons
+        (order_id, addon_id, addon_name, unit_price, quantity, line_total)
+        VALUES (?, ?, ?, ?, 1, ?)"
+    );
+
+    foreach ($selected as $addonId) {
+        $price = (int)$addons[$addonId]['price'];
+
+        $a->execute([
+            $id,
+            $addonId,
+            $addons[$addonId]['name'],
+            $price,
+            $price
+        ]);
+    }
+
+    $brief = $pdo->prepare(
+        "INSERT INTO order_briefs
+        (order_id, graduation_status, target_industry,
+         portfolio_language, visual_style, color_palette, cloud_link)
+        VALUES (?, ?, ?, ?, ?, ?, ?)"
+    );
+
+    $brief->execute([
+        $id,
+        $graduation,
+        $industry,
+        $language,
+        $style,
+        $palette,
+        trim((string)($b['cloudLink'] ?? ''))
+    ]);
+
+    $f = $pdo->prepare(
+        "INSERT INTO order_files
+        (order_id, original_name, file_size, upload_status)
+        VALUES (?, ?, ?, 'metadata_only')"
+    );
+
+    foreach (($input['uploadedFiles'] ?? []) as $file) {
+        if (!is_array($file)) continue;
+
+        $fn = trim((string)($file['name'] ?? ''));
+
+        if ($fn !== '') {
+            $f->execute([
+                $id,
+                substr($fn, 0, 255),
+                max(0, (int)($file['size'] ?? 0))
+            ]);
+        }
+    }
+}
+
+$pdo->commit();
+
+portera_respond(201, [
+    'success' => true,
+    'order_id' => $publicId,
+    'order_code' => $orderCode ?? ($existing['order_code'] ?? ''),
+    'message' => 'Pesanan berhasil disimpan.'
+]);
 } catch(Throwable $e) {
  if(isset($pdo)&&$pdo instanceof PDO&&$pdo->inTransaction())$pdo->rollBack();
  error_log('create-order: '.$e->getMessage());

@@ -129,7 +129,15 @@ export default function CheckoutPage() {
                 <div className="customer-detail"><small>Nomor WhatsApp</small><strong>♧　{order.customer?.whatsapp || '-'}</strong></div>
                 <div className="customer-detail full"><small>Universitas &amp; Program Studi</small><strong>♧　{[order.customer?.university, order.customer?.major].filter(Boolean).join(' - ') || '-'}</strong></div>
               </div>
-              <button className="checkout-edit-link" type="button" onClick={() => router.push('/pemesanan')}>Ubah data brief</button>
+              <button
+              className="checkout-edit-link"
+              type="button"
+              onClick={() => router.push(
+                `/pemesanan?edit_order_id=${encodeURIComponent(order.order_id)}`
+              )}
+            >
+              Ubah data brief
+            </button>
             </article>
             <article className="checkout-panel">
               <div className="checkout-panel-heading"><span className="checkout-panel-icon">▤</span><div><h2>Ringkasan Brief Portfolio</h2><p>Preferensi desain yang kamu pilih pada formulir.</p></div></div>
